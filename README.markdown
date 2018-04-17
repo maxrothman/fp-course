@@ -19,6 +19,14 @@ https://github.com/NICTA/course which is deprecated.
 Data61 replaces what was NICTA since July 2016. The new repository is located at
 https://github.com/data61/fp-course.
 
+#### SELF NOTES!
+* running tests: `stack test course:tasty`
+* running only tests for file `List.hs`: `stack test course:tasty --ta=--pattern=Tests/List`
+* running only tests for `headOr` in `List.hs`: `stack test course:tasty --ta=--pattern=Tests/List/headOr`
+* running doctests on `Validation.hs` (mirror of tasty tests): `stack exec doctest src/Course/Validation.hs`
+* running my code in ghci: `stack ghci course`, then `:l src/Course/filename.hs`, then `:r` as necessary
+  * `:l` is short for `:load`
+
 #### Introduction
 
 The course is structured according to a linear progression and uses the Haskell
