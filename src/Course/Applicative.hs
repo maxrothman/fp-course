@@ -124,6 +124,11 @@ instance Applicative ((->) t) where
     -> ((->) t b)
   (<*>) f g = \x -> f x (g x)
 
+-- f x (g x)
+-- g = h x (i x)
+-- f x (h x (i x))
+
+-- (t -> (a -> b)) -> (t -> a) -> (t -> b)
 
 -- | Apply a binary function in the environment.
 --
@@ -341,8 +346,8 @@ replicateA ::
   -> f (List a)
 replicateA times = sequence . recurse times Nil
   where
-    recurse times acc val = if times > 0
-                            then recurse (times-1) (val :. acc) val
+    recurse times' acc val = if times' > 0
+                            then recurse (times'-1) (val :. acc) val
                             else acc
 
 -- | Filter a list with a predicate that produces an effect.

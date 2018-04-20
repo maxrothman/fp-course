@@ -78,6 +78,8 @@ the contents of b
 the contents of c
 
 -}
+seqmap :: (a -> IO b) -> List a -> IO (List b)
+seqmap f = sequence . map f
 
 -- Given the file name, and file contents, print them.
 -- Use @putStrLn@.
@@ -85,46 +87,56 @@ printFile ::
   FilePath
   -> Chars
   -> IO ()
-printFile =
-  error "todo: Course.FileIO#printFile"
+printFile path contents = do
+  putStrLn $ "============ " ++ path
+  putStrLn contents
 
 -- Given a list of (file name and file contents), print each.
 -- Use @printFile@.
 printFiles ::
   List (FilePath, Chars)
   -> IO ()
-printFiles =
-  error "todo: Course.FileIO#printFiles"
+printFiles = void . seqmap (uncurry printFile)
 
 -- Given a file name, return (file name and file contents).
 -- Use @readFile@.
 getFile ::
   FilePath
   -> IO (FilePath, Chars)
-getFile =
-  error "todo: Course.FileIO#getFile"
+getFile fname = (,) fname <$> readFile fname
 
 -- Given a list of file names, return list of (file name and file contents).
 -- Use @getFile@.
 getFiles ::
   List FilePath
   -> IO (List (FilePath, Chars))
-getFiles =
-  error "todo: Course.FileIO#getFiles"
+getFiles = seqmap getFile
 
 -- Given a file name, read it and for each line in that file, read and print contents of each.
 -- Use @getFiles@ and @printFiles@.
 run ::
   FilePath
   -> IO ()
-run =
-  error "todo: Course.FileIO#run"
+run fname = do
+  -- Is there a way to do this without saving each intermediate step to a name?
+  rawfiles <- readFile fname
+  rawlines <- pure $ lines rawfiles
+  files <- getFiles rawlines
+  printFiles files
 
 -- /Tip:/ use @getArgs@ and @run@
 main ::
   IO ()
-main =
-  error "todo: Course.FileIO#main"
+main = do
+  args <- getArgs
+  arg <- pure $ headOr (error "need 1 arg!") args
+  run arg
+
+-- They used <$> in a lot of the places I used map. Is there a real difference outside of the course?
+
+-- It seemed like I needed `sequence` pretty frequently. Is that common? I see there's a prelude
+-- with almost the same type signature (monad instaed of applicative)
+
 
 ----
 
