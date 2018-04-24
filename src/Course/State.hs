@@ -38,8 +38,7 @@ exec ::
   State s a
   -> s
   -> s
-exec =
-  error "todo: Course.State#exec"
+exec func initState = snd $ runState func initState
 
 -- | Run the `State` seeded with `s` and retrieve the resulting value.
 --
@@ -48,8 +47,7 @@ eval ::
   State s a
   -> s
   -> a
-eval =
-  error "todo: Course.State#eval"
+eval func initState = fst $ runState func initState
 
 -- | A `State` where the state also distributes into the produced value.
 --
@@ -57,8 +55,7 @@ eval =
 -- (0,0)
 get ::
   State s s
-get =
-  error "todo: Course.State#get"
+get = State $ \x -> (x, x)
 
 -- | A `State` where the resulting state is seeded with the given value.
 --
@@ -67,8 +64,7 @@ get =
 put ::
   s
   -> State s ()
-put =
-  error "todo: Course.State#put"
+put s = State (\_ -> ((), s))
 
 -- | Implement the `Functor` instance for `State s`.
 --
@@ -79,8 +75,9 @@ instance Functor (State s) where
     (a -> b)
     -> State s a
     -> State s b
-  (<$>) =
-    error "todo: Course.State#(<$>)"
+  (<$>) func statecomp = State (\state -> 
+    let (result, state') = runState statecomp state in
+    (func result, state'))
 
 -- | Implement the `Applicative` instance for `State s`.
 --
@@ -97,14 +94,15 @@ instance Applicative (State s) where
   pure ::
     a
     -> State s a
-  pure =
-    error "todo: Course.State pure#instance (State s)"
+  pure x = State (\y -> (x, y))
   (<*>) ::
     State s (a -> b)
     -> State s a
     -> State s b 
-  (<*>) =
-    error "todo: Course.State (<*>)#instance (State s)"
+  (<*>) sf sa = State (\state ->
+    let (f, state')  = runState sf state
+        (a, state'') = runState sa state' in
+    (f a, state''))
 
 -- | Implement the `Bind` instance for `State s`.
 --
@@ -118,8 +116,9 @@ instance Monad (State s) where
     (a -> State s b)
     -> State s a
     -> State s b
-  (=<<) =
-    error "todo: Course.State (=<<)#instance (State s)"
+  (=<<) sf sa = State (\state ->
+    let (a, state') = runState sa state in
+    runState (sf a) state') 
 
 -- | Find the first element in a `List` that satisfies a given predicate.
 -- It is possible that no element is found, hence an `Optional` result.
@@ -140,8 +139,9 @@ findM ::
   (a -> f Bool)
   -> List a
   -> f (Optional a)
-findM =
-  error "todo: Course.State#findM"
+findM func l = foldRight search (pure Empty) l
+  where
+    search i acc = (\b -> if b then pure $ Full i else acc) =<< func i
 
 -- | Find the first element in a `List` that repeats.
 -- It is possible that no element repeats, hence an `Optional` result.
@@ -154,8 +154,21 @@ firstRepeat ::
   Ord a =>
   List a
   -> Optional a
-firstRepeat =
-  error "todo: Course.State#firstRepeat"
+firstRepeat l = eval (findM predicate l) S.empty
+  where
+    predicate item = do
+      set <- get
+      if S.member item set
+        then pure True
+        else do put $ S.insert item set
+                pure False
+
+-- use findM with a funtion that looks for the first thing already in the state
+
+-- State func should return (a, s) where a::Bool = whether the item was in the state and s::Set = a
+-- new set with the item maybe inserted (if it wasn't already there)
+--    but s the arg has to be the same type as s in the return value, how do I pass in the new item?
+
 
 -- | Remove all duplicate elements in a `List`.
 -- /Tip:/ Use `filtering` and `State` with a @Data.Set#Set@.
@@ -167,8 +180,16 @@ distinct ::
   Ord a =>
   List a
   -> List a
-distinct =
-  error "todo: Course.State#distinct"
+distinct l = eval (filtering func l) S.empty
+  where
+    func itm = do
+      set <- get
+      notMember <- pure $ not $ S.member itm set
+      if notMember
+        then put $ S.insert itm set
+        else pure ()
+      pure notMember
+
 
 -- | A happy number is a positive integer, where the sum of the square of its digits eventually reaches 1 after repetition.
 -- In contrast, a sad number (not a happy number) is where the sum of the square of its digits never reaches 1
@@ -192,7 +213,13 @@ distinct =
 -- >>> isHappy 44
 -- True
 isHappy ::
-  Integer
+  Int
   -> Bool
-isHappy =
-  error "todo: Course.State#isHappy"
+isHappy someInt =
+  let
+    digits num = map digitToInt $ show' num
+    digitSquares = map (\x -> x*x)
+    sumDigitSquares num = sum $ digitSquares $  digits num
+    happySeq = produce sumDigitSquares someInt
+  in
+  contains 1 $ firstRepeat happySeq
