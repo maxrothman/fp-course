@@ -3,6 +3,7 @@
 {-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE RebindableSyntax #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TupleSections #-}
 
 module Course.StateT where
 
@@ -30,6 +31,10 @@ newtype StateT s f a =
       -> f (a, s)
   }
 
+-- It'd be nice to be able to show the types in this, but that's probably hard because of polymorphism
+instance Show a => Show (StateT s f a) where
+  show _ = "StateT"
+
 -- | Implement the `Functor` instance for @StateT s f@ given a @Functor f@.
 --
 -- >>> runStateT ((+1) <$> (pure 2) :: StateT Int List Int) 0
@@ -39,8 +44,10 @@ instance Functor f => Functor (StateT s f) where
     (a -> b)
     -> StateT s f a
     -> StateT s f b
-  (<$>) =
-    error "todo: Course.StateT (<$>)#instance (StateT s f)"
+  (<$>) func (StateT state) = StateT ((<$>) applyFst . state)
+    where applyFst (x, y) = (func x, y)
+-- Oooooh, This isn't (<$>) (applyFst . state), it's ((<$>) applyFst) . state
+
 
 -- | Implement the `Applicative` instance for @StateT s f@ given a @Monad f@.
 --
@@ -60,17 +67,17 @@ instance Functor f => Functor (StateT s f) where
 -- >>> runStateT (StateT (\s -> ((+2), s P.++ [1]) :. ((+3), s P.++ [1]) :. Nil) <*> (StateT (\s -> (2, s P.++ [2]) :. Nil))) [0]
 -- [(4,[0,1,2]),(5,[0,1,2])]
 instance Monad f => Applicative (StateT s f) where
-  pure ::
-    a
-    -> StateT s f a
-  pure =
-    error "todo: Course.StateT pure#instance (StateT s f)"
+  pure :: a -> StateT s f a
+  pure a = StateT $ pure . (a,)
+
   (<*>) ::
    StateT s f (a -> b)
     -> StateT s f a
     -> StateT s f b
-  (<*>) =
-    error "todo: Course.StateT (<*>)#instance (StateT s f)"
+  (<*>) (StateT mf) (StateT ma) = StateT $ \s -> do
+      (f, s')  <- mf s
+      (a, s'') <- ma s'
+      pure (f a, s'')
 
 -- | Implement the `Monad` instance for @StateT s f@ given a @Monad f@.
 -- Make sure the state value is passed through in `bind`.
@@ -85,8 +92,10 @@ instance Monad f => Monad (StateT s f) where
     (a -> StateT s f b)
     -> StateT s f a
     -> StateT s f b
-  (=<<) =
-    error "todo: Course.StateT (=<<)#instance (StateT s f)"
+  (=<<) f (StateT state) = StateT $ \s -> do
+    (a, s') <- state s
+    runStateT (f a) s'
+-- REVIEW: Their solution is point-free for s, is theirs desirable or too clever?
 
 -- | A `State'` is `StateT` specialised to the `ExactlyOne` functor.
 type State' s a =
@@ -99,8 +108,7 @@ type State' s a =
 state' ::
   (s -> (a, s))
   -> State' s a
-state' =
-  error "todo: Course.StateT#state'"
+state' f = StateT $ ExactlyOne . f
 
 -- | Provide an unwrapper for `State'` values.
 --
@@ -110,8 +118,7 @@ runState' ::
   State' s a
   -> s
   -> (a, s)
-runState' =
-  error "todo: Course.StateT#runState'"
+runState' (StateT st) = runExactlyOne . st
 
 -- | Run the `StateT` seeded with `s` and retrieve the resulting state.
 execT ::
@@ -119,16 +126,18 @@ execT ::
   StateT s f a
   -> s
   -> f s
-execT =
-  error "todo: Course.StateT#execT"
+execT (StateT st) = (<$>) snd . st
+-- REVIEW: I feel like I should be able to eta-reduce `st` out, but for that I'd need to replace (.)
+-- with one of this type:
+-- (c -> d) -> (a -> b -> c) -> a -> b -> d
+-- and I couldn't find any such function on hoogle
 
 -- | Run the `State` seeded with `s` and retrieve the resulting state.
 exec' ::
   State' s a
   -> s
   -> s
-exec' =
-  error "todo: Course.StateT#exec'"
+exec' st = runExactlyOne . execT st
 
 -- | Run the `StateT` seeded with `s` and retrieve the resulting value.
 evalT ::
@@ -136,16 +145,14 @@ evalT ::
   StateT s f a
   -> s
   -> f a
-evalT =
-  error "todo: Course.StateT#evalT"
+evalT (StateT st) = (<$>) fst . st
 
 -- | Run the `State` seeded with `s` and retrieve the resulting value.
 eval' ::
   State' s a
   -> s
   -> a
-eval' =
-  error "todo: Course.StateT#eval'"
+eval' st = runExactlyOne . evalT st
 
 -- | A `StateT` where the state also distributes into the produced value.
 --
@@ -154,8 +161,7 @@ eval' =
 getT ::
   Applicative f =>
   StateT s f s
-getT =
-  error "todo: Course.StateT#getT"
+getT = StateT $ \s -> pure (s, s)
 
 -- | A `StateT` where the resulting state is seeded with the given value.
 --
@@ -168,8 +174,7 @@ putT ::
   Applicative f =>
   s
   -> StateT s f ()
-putT =
-  error "todo: Course.StateT#putT"
+putT = StateT . const . pure . ((),)
 
 -- | Remove all duplicate elements in a `List`.
 --
@@ -180,8 +185,16 @@ distinct' ::
   (Ord a, Num a) =>
   List a
   -> List a
-distinct' =
-  error "todo: Course.StateT#distinct'"
+distinct' l = eval' (filtering pred l) S.empty
+  where
+    pred itm = do
+      set <- getT
+      let notMember = S.notMember itm set   -- REVIEW: this isn't going to make S.notMember get evaluated twice, is it?
+      if notMember
+        then putT $ S.insert itm set
+        else pure ()
+      pure notMember
+-- REVIEW: theirs is a 1-liner, but uses more Control.Arrow stuff. Is it overly clever?
 
 -- | Remove all duplicate elements in a `List`.
 -- However, if you see a value greater than `100` in the list,
@@ -195,11 +208,23 @@ distinct' =
 -- >>> distinctF $ listh [1,2,3,2,1,101]
 -- Empty
 distinctF ::
-  (Ord a, Num a) =>
+  forall a. (Ord a, Num a, Show a) =>
   List a
   -> Optional (List a)
-distinctF =
-  error "todo: Course.StateT#distinctF"
+distinctF l = evalT (filtering pred l) S.empty
+  where
+    pred :: a -> StateT (S.Set a) Optional Bool
+    pred itm =
+      if itm > 100
+        then StateT $ const Empty
+        else do
+          set <- getT
+          let notMember = S.notMember itm set
+          if notMember
+            then putT $ S.insert itm set
+            else pure ()
+          pure notMember
+-- REVIEW: theirs is much shorter, and doesn't use any Control.Arrow. Is this overly verbose?
 
 -- | An `OptionalT` is a functor of an `Optional` value.
 data OptionalT f a =
@@ -213,8 +238,7 @@ data OptionalT f a =
 -- >>> runOptionalT $ (+1) <$> OptionalT (Full 1 :. Empty :. Nil)
 -- [Full 2,Empty]
 instance Functor f => Functor (OptionalT f) where
-  (<$>) =
-    error "todo: Course.StateT (<$>)#instance (OptionalT f)"
+  (<$>) func (OptionalT fopt) = OptionalT $ (<$>) func <$> fopt
 
 -- | Implement the `Applicative` instance for `OptionalT f` given a Monad f.
 --
@@ -241,11 +265,27 @@ instance Functor f => Functor (OptionalT f) where
 -- >>> runOptionalT $ OptionalT (Full (+1) :. Full (+2) :. Nil) <*> OptionalT (Full 1 :. Empty :. Nil)
 -- [Full 2,Empty,Full 3,Empty]
 instance Monad f => Applicative (OptionalT f) where
-  pure =
-    error "todo: Course.StateT pure#instance (OptionalT f)"
-  (<*>) =
-    error "todo: Course.StateT (<*>)#instance (OptionalT f)"
+  pure = OptionalT . pure . Full
 
+  -- (<*>) :: OptionalT (f (Optional (a -> b))) -> OptionalT (f (Optional a)) -> OptionalT (f (Optional b))
+  -- ffunc :: f (Optional (a -> b))
+  -- fa    :: f (Optional a)
+  -- func <*> :: f _ -> f b
+  OptionalT ffunc <*> OptionalT fa = OptionalT $ (<*>) ffunc <*> _
+
+  -- OptionalT ffunc <*> OptionalT fa = OptionalT $ do
+  --   maybeFunc <- ffunc
+  --   maybeA <- fa
+  --   case maybeFunc of
+  --     Empty -> Empty
+  --     Full func -> case maybeA of
+  --       Empty -> Empty
+  --       Full a -> Full $ func a
+
+
+  -- OptionalT ffunc <*> OptionalT fa = onFull t -> f (Optional a) Optional t
+  --   Applicative f => (t -> f (Optional a)) -> Optional t -> f (Optional a)
+  -- theirs: OptionalT $ (<*>) <$> ffunc <*> fa (but doesn't pass all tests?)
 -- | Implement the `Monad` instance for `OptionalT f` given a Monad f.
 --
 -- >>> runOptionalT $ (\a -> OptionalT (Full (a+1) :. Full (a+2) :. Nil)) =<< OptionalT (Full 1 :. Empty :. Nil)

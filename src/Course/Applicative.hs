@@ -155,7 +155,7 @@ lift2 ::
   -> f a
   -> f b
   -> f c
-lift2 func functor1 functor2 = pure func <*> functor1 <*> functor2
+lift2 func functor1 functor2 = func <$> functor1 <*> functor2
 
 -- | Apply a ternary function in the environment.
 -- /can be written using `lift2` and `(<*>)`./

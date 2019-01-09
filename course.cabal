@@ -34,6 +34,7 @@ library
   build-depends:      base < 5 && >= 4
                       , containers >= 0.4.0.0
                       , array >= 0.4
+                      , case-insensitive
 
   ghc-options:        -Wall
                       -fwarn-incomplete-uni-patterns

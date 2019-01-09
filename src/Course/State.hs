@@ -38,7 +38,7 @@ exec ::
   State s a
   -> s
   -> s
-exec func initState = snd $ runState func initState
+exec f = snd . runState f
 
 -- | Run the `State` seeded with `s` and retrieve the resulting value.
 --
@@ -47,7 +47,7 @@ eval ::
   State s a
   -> s
   -> a
-eval func initState = fst $ runState func initState
+eval (State f) = fst . f
 
 -- | A `State` where the state also distributes into the produced value.
 --
