@@ -29,8 +29,7 @@ instance Comonad ExactlyOne where
   copure ::
     ExactlyOne a
     -> a
-  copure =
-    error "todo: Course.Comonad copure#instance ExactlyOne"
+  copure (ExactlyOne a) = a
 
 -- | Witness that all things with (<<=) and copure also have (<$>).
 --
@@ -41,5 +40,5 @@ instance Comonad ExactlyOne where
   (a -> b)
   -> f a
   -> f b
-(<$$>) =
-  error "todo: Course.Comonad#(<$>)"
+func <$$> fa = func . copure <<= fa
+-- REVIEW: would it be desireable to eta-reduce this to `(<$$>) f = (f . copure <<=)` ?
