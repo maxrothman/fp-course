@@ -366,21 +366,18 @@ distinctG l = runOptionalT $ evalT (filtering func l) S.empty
   where
     func :: a -> StateT (S.Set a) (OptionalT (Logger Chars)) Bool
     func itm =
-      if | itm > 100 -> StateT . const . OptionalT $ log1 (fromString $ "aborting > 100: " P.++ show itm) Empty
-         | even itm -> ifMember itm
-            (\i s -> logEven i $ Full (False, s))
-            (\i s -> logEven i $ Full (True, S.insert i s))
-         | otherwise -> ifMember itm
-            (\_ _ -> pure False)
-            (\_ _ -> pure True)
-      
-    logEven itm val = StateT . const . OptionalT $ log1 (fromString  $ "even number: " P.++ show itm) val
-    ifMember itm ifTrue ifFalse = do
-      theSet <- getT
-      if S.notMember itm theSet
-        then ifFalse itm theSet
-        else ifTrue itm theSet
-    
+      if itm > 100
+        then buildStack $ log "aborting > 100: " itm Empty
+        else do
+          theSet <- getT
+          let notMember = S.notMember itm theSet
+          if even itm
+            then buildStack . log "even number: " itm $ Full (notMember, S.insert itm theSet)
+            else pure notMember
+
+    log msg itm = log1 (fromString $ msg P.++ show itm)
+    buildStack = StateT . const . OptionalT
+
     -- REVIEW: there's got to be an easier way to do this
 
 onFull ::
