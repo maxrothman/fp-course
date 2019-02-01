@@ -4,6 +4,7 @@
 {-# LANGUAGE RebindableSyntax #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TupleSections #-}
+{-# LANGUAGE MultiWayIf #-}
 
 module Course.StateT where
 
@@ -267,32 +268,38 @@ instance Functor f => Functor (OptionalT f) where
 instance Monad f => Applicative (OptionalT f) where
   pure = OptionalT . pure . Full
 
-  -- (<*>) :: OptionalT (f (Optional (a -> b))) -> OptionalT (f (Optional a)) -> OptionalT (f (Optional b))
-  -- ffunc :: f (Optional (a -> b))
-  -- fa    :: f (Optional a)
-  -- func <*> :: f _ -> f b
-  OptionalT ffunc <*> OptionalT fa = OptionalT $ (<*>) ffunc <*> _
+  OptionalT ffunc <*> OptionalT fa = OptionalT $ do
+    maybeFunc <- ffunc
+    case maybeFunc of
+      Empty     -> pure Empty
+      Full func -> do
+        a <- fa
+        pure $ func <$> a
+    -- REVIEW:
+    -- Above, you suggested solutions like these over more point-free ones like theirs
+    -- (OptionalT f <*> OptionalT a = OptionalT (lift2 (<*>) f a)). Does this fall into the same
+    -- category? I'm still trying to build my intuition around when it makes sense to go point-free
+    -- and when it doesn't.
+    --
+    -- Also, their version fails tests 5-7
+    -- (https://github.com/maxrothman/fp-course/blob/e20fcd61979b76778836dd5277181937ad6facc3/test/Course/StateTTest.hs#L133)
+    -- Mine did too when I had `a <- fa` in the top do. Moving it to the bottom do fixed the issue.
+    --
+    -- Also not really sure what the suggestion to use onFull was about, they don't use it either.
 
-  -- OptionalT ffunc <*> OptionalT fa = OptionalT $ do
-  --   maybeFunc <- ffunc
-  --   maybeA <- fa
-  --   case maybeFunc of
-  --     Empty -> Empty
-  --     Full func -> case maybeA of
-  --       Empty -> Empty
-  --       Full a -> Full $ func a
 
-
-  -- OptionalT ffunc <*> OptionalT fa = onFull t -> f (Optional a) Optional t
-  --   Applicative f => (t -> f (Optional a)) -> Optional t -> f (Optional a)
-  -- theirs: OptionalT $ (<*>) <$> ffunc <*> fa (but doesn't pass all tests?)
 -- | Implement the `Monad` instance for `OptionalT f` given a Monad f.
 --
 -- >>> runOptionalT $ (\a -> OptionalT (Full (a+1) :. Full (a+2) :. Nil)) =<< OptionalT (Full 1 :. Empty :. Nil)
 -- [Full 2,Full 3,Empty]
 instance Monad f => Monad (OptionalT f) where
-  (=<<) =
-    error "todo: Course.StateT (=<<)#instance (OptionalT f)"
+  func =<< OptionalT fa = OptionalT $ do
+    maybeA <- fa
+    case maybeA of
+      Empty -> pure Empty
+      Full a -> runOptionalT . func $ a
+      -- REVIEW: un-OptionalT'ing this to just re-OptionalT it again seems dumb. There's no
+      -- straightforward way around it, right? And I can assume the extra work will be optimized away?
 
 -- | A `Logger` is a pair of a list of log values (`[l]`) and an arbitrary value (`a`).
 data Logger l a =
@@ -304,8 +311,7 @@ data Logger l a =
 -- >>> (+3) <$> Logger (listh [1,2]) 3
 -- Logger [1,2] 6
 instance Functor (Logger l) where
-  (<$>) =
-    error "todo: Course.StateT (<$>)#instance (Logger l)"
+ func <$> Logger l a = Logger l (func a)
 
 -- | Implement the `Applicative` instance for `Logger`.
 --
@@ -315,10 +321,8 @@ instance Functor (Logger l) where
 -- >>> Logger (listh [1,2]) (+7) <*> Logger (listh [3,4]) 3
 -- Logger [1,2,3,4] 10
 instance Applicative (Logger l) where
-  pure =
-    error "todo: Course.StateT pure#instance (Logger l)"
-  (<*>) =
-    error "todo: Course.StateT (<*>)#instance (Logger l)"
+  pure = Logger Nil
+  Logger l1 f <*> Logger l2 a = Logger (l1 ++ l2) (f a)
 
 -- | Implement the `Monad` instance for `Logger`.
 -- The `bind` implementation must append log values to maintain associativity.
@@ -326,8 +330,9 @@ instance Applicative (Logger l) where
 -- >>> (\a -> Logger (listh [4,5]) (a+3)) =<< Logger (listh [1,2]) 3
 -- Logger [1,2,4,5] 6
 instance Monad (Logger l) where
-  (=<<) =
-    error "todo: Course.StateT (=<<)#instance (Logger l)"
+  func =<< Logger l a =
+    let Logger l' a' = func a in
+      Logger (l ++ l') a'
 
 -- | A utility function for producing a `Logger` with one log value.
 --
@@ -337,8 +342,7 @@ log1 ::
   l
   -> a
   -> Logger l a
-log1 =
-  error "todo: Course.StateT#log1"
+log1 l a = Logger (l :. Nil) a
 
 -- | Remove all duplicate integers from a list. Produce a log as you go.
 -- If there is an element above 100, then abort the entire computation and produce no result.
@@ -354,12 +358,30 @@ log1 =
 --
 -- >>> distinctG $ listh [1,2,3,2,6,106]
 -- Logger ["even number: 2","even number: 2","even number: 6","aborting > 100: 106"] Empty
-distinctG ::
+distinctG :: forall a.
   (Integral a, Show a) =>
   List a
   -> Logger Chars (Optional (List a))
-distinctG =
-  error "todo: Course.StateT#distinctG"
+distinctG l = runOptionalT $ evalT (filtering func l) S.empty
+  where
+    func :: a -> StateT (S.Set a) (OptionalT (Logger Chars)) Bool
+    func itm =
+      if | itm > 100 -> StateT . const . OptionalT $ log1 (fromString $ "aborting > 100: " P.++ show itm) Empty
+         | even itm -> ifMember itm
+            (\i s -> logEven i $ Full (False, s))
+            (\i s -> logEven i $ Full (True, S.insert i s))
+         | otherwise -> ifMember itm
+            (\_ _ -> pure False)
+            (\_ _ -> pure True)
+      
+    logEven itm val = StateT . const . OptionalT $ log1 (fromString  $ "even number: " P.++ show itm) val
+    ifMember itm ifTrue ifFalse = do
+      theSet <- getT
+      if S.notMember itm theSet
+        then ifFalse itm theSet
+        else ifTrue itm theSet
+    
+    -- REVIEW: there's got to be an easier way to do this
 
 onFull ::
   Applicative f =>
