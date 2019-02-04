@@ -16,8 +16,8 @@ newtype Compose f g a =
 -- Implement a Functor instance for Compose
 instance (Functor f, Functor g) =>
     Functor (Compose f g) where
-  (<$>) =
-    error "todo: Course.Compose (<$>)#instance (Compose f g)"
+  -- (a -> b) -> Compose f g a -> Compose f g b
+  func <$> Compose fga = Compose $ ((<$>) . (<$>)) func fga
 
 instance (Applicative f, Applicative g) =>
   Applicative (Compose f g) where

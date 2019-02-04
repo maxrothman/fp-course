@@ -367,18 +367,33 @@ distinctG l = runOptionalT $ evalT (filtering func l) S.empty
     func :: a -> StateT (S.Set a) (OptionalT (Logger Chars)) Bool
     func itm =
       if itm > 100
-        then buildStack $ log "aborting > 100: " itm Empty
+        then do
+          liftAll $ log "aborting > 100: " itm
+          liftState bail
         else do
           theSet <- getT
           let notMember = S.notMember itm theSet
+          putT $ S.insert itm theSet
           if even itm
-            then buildStack . log "even number: " itm $ Full (notMember, S.insert itm theSet)
+            then do
+              liftAll $ log "even number: " itm
+              pure notMember
             else pure notMember
 
-    log msg itm = log1 (fromString $ msg P.++ show itm)
-    buildStack = StateT . const . OptionalT
+    log msg itm = log1 (fromString $ msg P.++ show itm) ()
 
-    -- REVIEW: there's got to be an easier way to do this
+    liftOpt :: Functor f => f b -> OptionalT f b
+    liftOpt fb = OptionalT $ Full <$> fb
+
+    liftState :: Functor f => f b -> StateT s f b
+    liftState fb = StateT $ \s -> (, s) <$> fb
+
+    liftAll :: Functor f => f b -> StateT s (OptionalT f) b
+    liftAll = liftState . liftOpt
+
+    bail :: Monad f => OptionalT f b
+    bail = OptionalT $ pure Empty
+
 
 onFull ::
   Applicative f =>

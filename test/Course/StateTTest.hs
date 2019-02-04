@@ -179,4 +179,7 @@ distinctGTest =
   , testCase "Empty case" $
       let expected = Logger (listh <$> ("even number: 2":."even number: 2":."even number: 6":."aborting > 100: 106":.Nil)) Empty
        in distinctG (listh [1,2,3,2,6,106]) @?= expected
+  , testCase "Removes duplicates" $
+      let expected = Logger Nil $ Full (1 :. Nil)
+       in distinctG (listh [1, 1]) @?= expected
   ]
