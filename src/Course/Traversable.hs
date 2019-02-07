@@ -11,6 +11,7 @@ import Course.List
 import Course.ExactlyOne
 import Course.Optional
 import Course.Compose
+import Debug.Trace
 
 -- | All instances of the `Traversable` type-class must satisfy three laws. These
 -- laws are not checked by the compiler. These laws are given as:
@@ -82,7 +83,10 @@ instance (Traversable f, Traversable g) =>
   Traversable (Compose f g) where
 -- Implement the traverse function for a Traversable instance for Compose
   traverse :: Applicative t => (a -> t b) -> Compose f g a -> t (Compose f g b)
-  traverse func ca = sequenceA $ func <$> ca
+  traverse func ca = (func <$>) 
+  -- Compose f g (t b) -> t (Compose f g b)
+  -- f (a -> t b) -> (f t a -> f t b)
+  -- a -> t b
 
 -- | The `Product` data type contains one value from each of the two type constructors.
 data Product f g a =

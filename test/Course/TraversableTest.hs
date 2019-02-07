@@ -13,6 +13,7 @@ import           Course.Functor
 import           Course.List           (List (..), listh)
 import           Course.Optional       (Optional (..))
 import           Course.Traversable
+import Debug.Trace
 
 test_Traversable :: TestTree
 test_Traversable =
