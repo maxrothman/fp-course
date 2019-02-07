@@ -72,7 +72,7 @@ instance Monad f => Applicative (StateT s f) where
   pure a = StateT $ pure . (a,)
 
   (<*>) ::
-   StateT s f (a -> b)
+    StateT s f (a -> b)
     -> StateT s f a
     -> StateT s f b
   (<*>) (StateT mf) (StateT ma) = StateT $ \s -> do
@@ -122,6 +122,9 @@ runState' ::
 runState' (StateT st) = runExactlyOne . st
 
 -- | Run the `StateT` seeded with `s` and retrieve the resulting state.
+--
+-- >>> execT (StateT $ \s -> Full ((), s + 1)) 2
+-- Full 3
 execT ::
   Functor f =>
   StateT s f a
@@ -133,7 +136,10 @@ execT (StateT st) = (<$>) snd . st
 -- (c -> d) -> (a -> b -> c) -> a -> b -> d
 -- and I couldn't find any such function on hoogle
 
--- | Run the `State` seeded with `s` and retrieve the resulting state.
+-- | Run the `State'` seeded with `s` and retrieve the resulting state.
+--
+-- >>> exec' (state' $ \s -> ((), s + 1)) 2
+-- 3
 exec' ::
   State' s a
   -> s
@@ -141,6 +147,9 @@ exec' ::
 exec' st = runExactlyOne . execT st
 
 -- | Run the `StateT` seeded with `s` and retrieve the resulting value.
+--
+-- >>> evalT (StateT $ \s -> Full (even s, s + 1)) 2
+-- Full True
 evalT ::
   Functor f =>
   StateT s f a
@@ -148,7 +157,10 @@ evalT ::
   -> f a
 evalT (StateT st) = (<$>) fst . st
 
--- | Run the `State` seeded with `s` and retrieve the resulting value.
+-- | Run the `State'` seeded with `s` and retrieve the resulting value.
+--
+-- >>> eval' (state' $ \s -> (even s, s + 1)) 5
+-- False
 eval' ::
   State' s a
   -> s
@@ -239,6 +251,10 @@ data OptionalT f a =
 -- >>> runOptionalT $ (+1) <$> OptionalT (Full 1 :. Empty :. Nil)
 -- [Full 2,Empty]
 instance Functor f => Functor (OptionalT f) where
+  (<$>) ::
+    (a -> b)
+    -> OptionalT f a
+    -> OptionalT f b
   (<$>) func (OptionalT fopt) = OptionalT $ (<$>) func <$> fopt
 
 -- | Implement the `Applicative` instance for `OptionalT f` given a Monad f.
@@ -266,8 +282,15 @@ instance Functor f => Functor (OptionalT f) where
 -- >>> runOptionalT $ OptionalT (Full (+1) :. Full (+2) :. Nil) <*> OptionalT (Full 1 :. Empty :. Nil)
 -- [Full 2,Empty,Full 3,Empty]
 instance Monad f => Applicative (OptionalT f) where
+  pure ::
+    a
+    -> OptionalT f a
   pure = OptionalT . pure . Full
 
+  (<*>) ::
+    OptionalT f (a -> b)
+    -> OptionalT f a
+    -> OptionalT f b
   OptionalT ffunc <*> OptionalT fa = OptionalT $ do
     maybeFunc <- ffunc
     case maybeFunc of
@@ -293,6 +316,10 @@ instance Monad f => Applicative (OptionalT f) where
 -- >>> runOptionalT $ (\a -> OptionalT (Full (a+1) :. Full (a+2) :. Nil)) =<< OptionalT (Full 1 :. Empty :. Nil)
 -- [Full 2,Full 3,Empty]
 instance Monad f => Monad (OptionalT f) where
+  (=<<) ::
+    (a -> OptionalT f b)
+    -> OptionalT f a
+    -> OptionalT f b
   func =<< OptionalT fa = OptionalT $ do
     maybeA <- fa
     case maybeA of
@@ -311,7 +338,11 @@ data Logger l a =
 -- >>> (+3) <$> Logger (listh [1,2]) 3
 -- Logger [1,2] 6
 instance Functor (Logger l) where
- func <$> Logger l a = Logger l (func a)
+  (<$>) ::
+    (a -> b)
+    -> Logger l a
+    -> Logger l b
+  func <$> Logger l a = Logger l (func a)
 
 -- | Implement the `Applicative` instance for `Logger`.
 --
@@ -321,7 +352,15 @@ instance Functor (Logger l) where
 -- >>> Logger (listh [1,2]) (+7) <*> Logger (listh [3,4]) 3
 -- Logger [1,2,3,4] 10
 instance Applicative (Logger l) where
+  pure ::
+    a
+    -> Logger l a
   pure = Logger Nil
+
+  (<*>) ::
+    Logger l (a -> b)
+    -> Logger l a
+    -> Logger l b
   Logger l1 f <*> Logger l2 a = Logger (l1 ++ l2) (f a)
 
 -- | Implement the `Monad` instance for `Logger`.
@@ -330,6 +369,10 @@ instance Applicative (Logger l) where
 -- >>> (\a -> Logger (listh [4,5]) (a+3)) =<< Logger (listh [1,2]) 3
 -- Logger [1,2,4,5] 6
 instance Monad (Logger l) where
+  (=<<) ::
+    (a -> Logger l b)
+    -> Logger l a
+    -> Logger l b
   func =<< Logger l a =
     let Logger l' a' = func a in
       Logger (l ++ l') a'
