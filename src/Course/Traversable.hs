@@ -83,10 +83,22 @@ instance (Traversable f, Traversable g) =>
   Traversable (Compose f g) where
 -- Implement the traverse function for a Traversable instance for Compose
   traverse :: Applicative t => (a -> t b) -> Compose f g a -> t (Compose f g b)
-  traverse func ca = (func <$>) 
-  -- Compose f g (t b) -> t (Compose f g b)
-  -- f (a -> t b) -> (f t a -> f t b)
-  -- a -> t b
+  traverse func ca = (traverse . traverse) func ca
+  -- traverse func (Compose fga) = ((<$>) . (<$>)) Compose func $ fga
+  -- why doesn't this work? In ghci:
+  -- >> :t func
+  -- func :: Num a => a -> Optional a
+  -- >> :t ((<$>) . (<$>)) Compose func $ ((1 :. Nil) :. Nil)
+  -- ((<$>) . (<$>)) Compose func $ ((1 :. Nil) :. Nil)
+  
+  -- (<$>) . (<$>)
+  -- (f c -> f d) -> g (f c) -> g (f d)  .  (c -> d) -> f c -> f d
+  -- b               c                      a           b
+  -- (c -> d) -> g (f c) -> g (f d)
+
+  -- Compose :: fga -> Compose fga
+  -- func :: a -> t b
+  -- (fga -> Compose (f (g a))) -> (a -> t b) = a -> t (Compose f g a)
 
 -- | The `Product` data type contains one value from each of the two type constructors.
 data Product f g a =
