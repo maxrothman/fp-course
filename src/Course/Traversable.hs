@@ -11,8 +11,9 @@ import Course.List
 import Course.ExactlyOne
 import Course.Optional
 import Course.Compose
+import Debug.Trace
 
--- | All instances of the `Traversable` type-class must satisfy two laws. These
+-- | All instances of the `Traversable` type-class must satisfy three laws. These
 -- laws are not checked by the compiler. These laws are given as:
 --
 -- * The law of naturality
@@ -45,8 +46,9 @@ instance Traversable ExactlyOne where
     (a -> f b)
     -> ExactlyOne a
     -> f (ExactlyOne b)
-  traverse =
-    error "todo: Course.Traversable traverse#instance ExactlyOne"
+  traverse func (ExactlyOne a) = ExactlyOne <$> func a
+  -- REVIEW: I know this eta-reduction is wrong, but I don't know why.
+  -- traverse func = ExactlyOne <$> func . runExactlyOne
 
 instance Traversable Optional where
   traverse ::
@@ -54,8 +56,12 @@ instance Traversable Optional where
     (a -> f b)
     -> Optional a
     -> f (Optional b)
-  traverse =
-    error "todo: Course.Traversable traverse#instance Optional"
+  traverse func oa = case oa of
+    Empty  -> pure Empty
+    Full a -> Full <$> func a
+
+  -- REVIEW: there's no answer key for this section, so I can't compare. Is there a clever way of
+  -- doing this that doesn't require inspecting the value of the Optional?
 
 -- | Sequences a traversable value of structures to a structure of a traversable value.
 --
@@ -71,18 +77,32 @@ sequenceA ::
   (Applicative f, Traversable t) =>
   t (f a)
   -> f (t a)
-sequenceA =
-  error "todo: Course.Traversable#sequenceA"
+sequenceA = traverse id
 
 instance (Traversable f, Traversable g) =>
   Traversable (Compose f g) where
 -- Implement the traverse function for a Traversable instance for Compose
-  traverse =
-    error "todo: Course.Traversable traverse#instance (Compose f g)"
+  traverse :: Applicative t => (a -> t b) -> Compose f g a -> t (Compose f g b)
+  traverse func ca = (traverse . traverse) func ca
+  -- traverse func (Compose fga) = ((<$>) . (<$>)) Compose func $ fga
+  -- why doesn't this work? In ghci:
+  -- >> :t func
+  -- func :: Num a => a -> Optional a
+  -- >> :t ((<$>) . (<$>)) Compose func $ ((1 :. Nil) :. Nil)
+  -- ((<$>) . (<$>)) Compose func $ ((1 :. Nil) :. Nil)
+  
+  -- (<$>) . (<$>)
+  -- (f c -> f d) -> g (f c) -> g (f d)  .  (c -> d) -> f c -> f d
+  -- b               c                      a           b
+  -- (c -> d) -> g (f c) -> g (f d)
+
+  -- Compose :: fga -> Compose fga
+  -- func :: a -> t b
+  -- (fga -> Compose (f (g a))) -> (a -> t b) = a -> t (Compose f g a)
 
 -- | The `Product` data type contains one value from each of the two type constructors.
 data Product f g a =
-  Product (f a) (g a)
+  Product (f a) (g a) deriving (Show, Eq)
 
 instance (Functor f, Functor g) =>
   Functor (Product f g) where
@@ -99,7 +119,7 @@ instance (Traversable f, Traversable g) =>
 -- | The `Coproduct` data type contains one value from either of the two type constructors.
 data Coproduct f g a =
   InL (f a)
-  | InR (g a)
+  | InR (g a) deriving (Show, Eq)
 
 instance (Functor f, Functor g) =>
   Functor (Coproduct f g) where

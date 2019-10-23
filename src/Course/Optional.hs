@@ -82,6 +82,22 @@ bindOptional f (Full x) = f x
 (<+>) Empty x = x
 (<+>) x _ = x
 
+-- | Replaces the Full and Empty constructors in an optional.
+--
+-- >>> optional (+1) 0 (Full 8)
+-- 9
+--
+-- >>> optional (+1) 0 Empty
+-- 0
+optional ::
+  (a -> b)
+  -> b
+  -> Optional a
+  -> b
+optional f b opA = case opA of
+  Full a -> f a
+  Empty  -> b 
+
 applyOptional :: Optional (a -> b) -> Optional a -> Optional b
 applyOptional f a = bindOptional (\f' -> mapOptional f' a) f
 

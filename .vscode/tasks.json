@@ -1,0 +1,127 @@
+{
+    "version": "0.1.0",
+    "command": "stack",
+    "suppressTaskName": true,
+    "isShellCommand": true,
+    "args": [],
+    "presentation": {
+        "reveal": "never"
+    },
+    "tasks": [
+        {
+            "taskName": "build",
+            "args": [
+                "build",
+                "course:lib"
+            ],
+            "isBuildCommand": true,
+            "problemMatcher": [
+                {
+                    "owner": "stack",
+                    "fileLocation": "absolute",
+                    "pattern": [
+                        {
+                            "regexp": "^(.*):(\\d+):([0-9-]+):$",
+                            "file": 1,
+                            "line": 2,
+                            "column": 3
+                        },
+                        {
+                            "regexp": "^\\s+(.*)$",
+                            "message": 1
+                        }
+                    ]
+                },
+                {
+                    "owner": "stack",
+                    "fileLocation": "absolute",
+                    "pattern": [
+                        {
+                            "regexp": "^(.*):(\\d+):([0-9-]+):\\s+([Ww]arning):\\s+(.*)$",
+                            "file": 1,
+                            "line": 2,
+                            "column": 3,
+                            "severity": 4,
+                            "code": 5
+                        },
+                        {
+                            "regexp": "^\\s*(.*)$",
+                            "message": 1
+                        }
+                    ]
+                },
+                {
+                    "owner": "stack",
+                    "fileLocation": "absolute",
+                    "pattern": [
+                        {
+                            "regexp": "^(.*):(\\d+):([0-9-]+):\\s+([Ww]arning|[Ee]rror):$",
+                            "file": 1,
+                            "line": 2,
+                            "column": 3,
+                            "severity": 4
+                        },
+                        {
+                            "regexp": "^\\s+(.*)$",
+                            "message": 1
+                        }
+                    ]
+                },
+                //Separate regex for errors with filename:(line,col)-(line,col) format
+                {
+                    "owner": "stack",
+                    "fileLocation": "absolute",
+                    "pattern": [
+                        {
+                            "regexp": "^(.*):\\((\\d+),(\\d+)\\)-\\((\\d+),(\\d+)\\):\\s+([Ww]arning|[Ee]rror):$",
+                            "file": 1,
+                            "line": 2,
+                            "column": 3,
+                            "severity": 6
+                            //TODO: do something with the other pair of (line, column)
+                        },
+                        {
+                            "regexp": "^\\s+(.*)$",
+                            "message": 1
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "taskName": "clean",
+            "args": [
+                "clean"
+            ],
+            "isBuildCommand": false,
+            "isTestCommand": false
+        },
+        {
+            "taskName": "test",
+            "args": [
+                "test"
+            ],
+            "isTestCommand": true,
+            "problemMatcher": [
+                {
+                    "owner": "hspec",
+                    "fileLocation": [
+                        "relative",
+                        "${workspaceRoot}"
+                    ],
+                    "pattern": [
+                        {
+                            "regexp": "^\\s+(.*):(\\d+):",
+                            "file": 1,
+                            "line": 2
+                        },
+                        {
+                            "regexp": "^\\s+\\d+\\)\\s+(.*)",
+                            "message": 1
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

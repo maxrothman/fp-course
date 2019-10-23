@@ -33,8 +33,7 @@ instance Extend ExactlyOne where
     (ExactlyOne a -> b)
     -> ExactlyOne a
     -> ExactlyOne b
-  (<<=) =
-    error "todo: Course.Extend (<<=)#instance ExactlyOne"
+  func <<= fa = ExactlyOne $ func fa
 
 -- | Implement the @Extend@ instance for @List@.
 --
@@ -51,8 +50,9 @@ instance Extend List where
     (List a -> b)
     -> List a
     -> List b
-  (<<=) =
-    error "todo: Course.Extend (<<=)#instance List"
+  _    <<= Nil           = Nil
+  func <<= l@(_ :. rest) = func l :. (func <<= rest)
+  -- REVIEW: is this the "right way" to do this, or should I be using foldr or something?
 
 -- | Implement the @Extend@ instance for @Optional@.
 --
@@ -66,8 +66,12 @@ instance Extend Optional where
     (Optional a -> b)
     -> Optional a
     -> Optional b
-  (<<=) =
-    error "todo: Course.Extend (<<=)#instance Optional"
+  func <<= fa = case fa of
+    Full _ -> Full $ func fa
+    Empty  -> Empty
+  -- func <<= fa@(Full _) = Full $ func fa
+  -- _    <<= Empty       = Empty
+  -- REVIEW: both of these work, any reason to prefer one over the other?
 
 -- | Duplicate the functor using extension.
 --
@@ -86,5 +90,4 @@ cojoin ::
   Extend f =>
   f a
   -> f (f a)
-cojoin =
-  error "todo: Course.Extend#cojoin"
+cojoin = (id <<=)

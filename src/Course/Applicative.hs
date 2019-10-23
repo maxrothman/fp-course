@@ -12,7 +12,7 @@ import Course.List
 import Course.Optional
 import qualified Prelude as P(fmap, return, (>>=))
 
--- | All instances of the `Applicative` type-class must satisfy three laws.
+-- | All instances of the `Applicative` type-class must satisfy four laws.
 -- These laws are not checked by the compiler. These laws are given as:
 --
 -- * The law of associative composition
@@ -324,6 +324,8 @@ sequence ::
 sequence l = foldRight (\x y -> (:.) <$> x <*> y) (pure Nil) l
 
 -- | Replicate an effect a given number of times.
+--
+-- /Tip:/ Use `Course.List#replicate`.
 --
 -- >>> replicateA 4 (ExactlyOne "hi")
 -- ExactlyOne ["hi","hi","hi","hi"]
